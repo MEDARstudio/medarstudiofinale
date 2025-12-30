@@ -1,3 +1,5 @@
+import { GoogleGenAI } from "@google/genai";
+
 // --- Data for the portfolio ---
 
 const portfolioItems = [
@@ -147,6 +149,16 @@ const socialLinks = [
     { name: 'LinkedIn', url: 'https://www.linkedin.com/in/mohamed-amine-amarir-4b4682256', icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /><path d="M8 11l0 5" /><path d="M8 8l0 .01" /><path d="M12 16l0 -5" /><path d="M16 16v-3a2 2 0 0 0 -4 0" /></svg>' }
 ];
 
+const quickQuestions = [
+    { question: "What services do you offer?", answer: "MEDAR STUDIO offers a range of creative services including UI/UX Design, Branding, Web Development, Illustration, and Motion Graphics. Do you have a specific project in mind?" },
+    { question: "Tell me more about your studio.", answer: "MEDAR STUDIO is a creative space where our team of passionate designers and visual artists collaborate to craft unique and impactful digital experiences. You can learn more in the 'About Us' section!" },
+    { question: "How can we start a project?", answer: "It's simple! Just head over to the 'Contact' section, fill out the form with some details about your project, and we'll get back to you as soon as possible to discuss the next steps." },
+];
+
+// --- Application State ---
+let currentSection = 'home';
+let inactivityTimer;
+
 // --- Core Application Logic ---
 
 /**
@@ -154,7 +166,8 @@ const socialLinks = [
  */
 function renderApp() {
     const appContainer = document.getElementById('root');
-    if (!appContainer) return;
+    const aiContainer = document.getElementById('ai-assistant-container');
+    if (!appContainer || !aiContainer) return;
 
     const categories = ['All', ...new Set(portfolioItems.map(item => item.category))];
     const logoText = "MEDAR STUDIO";
@@ -199,7 +212,6 @@ function renderApp() {
                     <h2>Recent Projects</h2>
                     <div class="carousel-3d-container" aria-roledescription="carousel">
                         <div class="carousel-3d" id="carousel3d" tabindex="0" aria-live="polite">
-                            <!-- JavaScript will generate cards here -->
                         </div>
                     </div>
                     <div class="carousel-buttons">
@@ -329,9 +341,36 @@ function renderApp() {
                     <p class="project-viewer-brief"></p>
                 </header>
                 <div class="project-viewer-body">
-                    <!-- JS will populate project steps here -->
                 </div>
              </div>
+        </div>
+    `;
+
+    aiContainer.innerHTML = `
+        <div class="ai-chat-widget">
+            <button class="chat-fab" aria-label="Open AI Assistant" aria-expanded="false">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8" /><path d="M8.5 12.5a5 5 0 1 0 -5 0V12a3 3 0 0 0 3 3h1" /><path d="M18 18.5a5 5 0 1 0 0 -10v1.5" /><path d="M12.5 18H14a3 3 0 0 0 3 -3v-.5" /><path d="M16 12h-4" /></svg>
+            </button>
+            <div class="chat-window" role="dialog" aria-modal="true" aria-labelledby="chat-heading">
+                <div class="chat-header">
+                    <h3 id="chat-heading">AI Assistant</h3>
+                    <button class="chat-close" aria-label="Close chat">&times;</button>
+                </div>
+                <div class="chat-body">
+                    <div class="chat-messages"></div>
+                </div>
+                <div class="chat-footer">
+                    <div class="quick-questions">
+                         ${quickQuestions.map(q => `<button class="quick-question-btn">${q.question}</button>`).join('')}
+                    </div>
+                    <form class="chat-form">
+                        <input type="text" placeholder="Ask me anything..." required />
+                        <button type="submit" aria-label="Send message">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14l11 -11" /><path d="M21 3l-6.5 18a.55 .55(a.55 .55) 0 0 1 -1 0l-3.5 -7l-7 -3.5a.55 .55 0 0 1 0 -1l18 -6.5" /></svg>
+                        </button>
+                    </form>
+                </div>
+            </div>
         </div>
     `;
 
@@ -344,46 +383,33 @@ function renderApp() {
     setupMobileNav();
     setupTestimonialsSlider();
     setupAboutToggle();
+    setupAIAssistant();
     setupContactForm();
     setupInteractiveBackground();
+    setupSectionObserver();
+    setupInactivityTimer();
 }
 
-/**
- * Adds a 'scrolled' class to the header when the user scrolls down.
- */
 function setupHeaderScrollEffect() {
     const header = document.querySelector('.header');
     if (!header) return;
-
     window.addEventListener('scroll', () => {
-        if (window.scrollY > 50) {
-            header.classList.add('scrolled');
-        } else {
-            header.classList.remove('scrolled');
-        }
+        if (window.scrollY > 50) header.classList.add('scrolled');
+        else header.classList.remove('scrolled');
     });
 }
 
-
-/**
- * Sets up the mobile navigation toggle functionality.
- */
 function setupMobileNav() {
     const navToggle = document.querySelector('.mobile-nav-toggle');
     const header = document.querySelector('.header');
-
     if (navToggle && header) {
         navToggle.addEventListener('click', () => {
             header.classList.toggle('nav-open');
-            const isExpanded = header.classList.contains('nav-open');
-            navToggle.setAttribute('aria-expanded', isExpanded.toString());
+            navToggle.setAttribute('aria-expanded', header.classList.contains('nav-open'));
         });
     }
 }
 
-/**
- * Sets up smooth scrolling for internal anchor links and handles mobile nav closing.
- */
 function setupSmoothScrolling() {
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
         anchor.addEventListener('click', function (e) {
@@ -400,16 +426,11 @@ function setupSmoothScrolling() {
                 return;
             }
             const targetElement = document.querySelector(targetId);
-            if (targetElement) {
-                targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+            if (targetElement) targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
     });
 }
 
-/**
- * Sets up the fade-in-on-scroll animation for various elements.
- */
 function setupScrollAnimations() {
     const items = document.querySelectorAll('.portfolio-item, .fade-in-up');
     const observer = new IntersectionObserver((entries) => {
@@ -419,63 +440,34 @@ function setupScrollAnimations() {
                 observer.unobserve(entry.target);
             }
         });
-    }, {
-        threshold: 0.1
-    });
-
-    items.forEach(item => {
-        observer.observe(item);
-    });
+    }, { threshold: 0.1 });
+    items.forEach(item => observer.observe(item));
 }
 
-/**
- * Sets up the 3D carousel for the portfolio section.
- */
 function setup3DCarousel() {
     const carousel3d = document.getElementById('carousel3d');
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
     const carouselContainer = document.querySelector('.carousel-3d-container');
-
     if (!carousel3d || !prevBtn || !nextBtn || !carouselContainer) return;
 
     const items = portfolioItems.slice(0, 6);
     const cardCount = items.length;
-    if (cardCount === 0) return;
-
     const theta = 360 / cardCount;
     let currentAngle = 0;
-    let autoRotateID = null;
-    let restartTimeout = null;
-    let isAutoRotating = true;
-    const autoRotateSpeed = 0.08;
-
-    // Drag state variables
     let isDragging = false;
     let dragStartX = 0;
-    let dragStartY = 0; // For touch gesture detection
     let startAngle = 0;
-    const dragSensitivity = 0.6; // Adjust for "feel"
+    const dragSensitivity = 0.6;
 
     const createCards = () => {
-        carousel3d.innerHTML = '';
         items.forEach((item, i) => {
             const card = document.createElement('div');
             card.className = 'card';
             card.style.transform = `rotateY(${i * theta}deg) translateZ(300px)`;
             if (i === 0) card.classList.add('active');
             card.dataset.id = item.id;
-            
-            const img = document.createElement('img');
-            img.src = item.coverImage;
-            img.alt = item.title;
-            card.appendChild(img);
-            
-            const overlay = document.createElement('div');
-            overlay.className = 'card-overlay';
-            overlay.innerHTML = `<h3>${item.title}</h3><p>${item.category}</p>`;
-            card.appendChild(overlay);
-
+            card.innerHTML = `<img src="${item.coverImage}" alt="${item.title}"><div class="card-overlay"><h3>${item.title}</h3><p>${item.category}</p></div>`;
             carousel3d.appendChild(card);
         });
     };
@@ -484,9 +476,7 @@ function setup3DCarousel() {
         const cards = carousel3d.querySelectorAll('.card');
         const normalizedAngle = ((currentAngle % 360) + 360) % 360;
         const index = Math.round(normalizedAngle / theta) % cardCount;
-        cards.forEach((card, i) => {
-            card.classList.toggle('active', i === (cardCount - index) % cardCount);
-        });
+        cards.forEach((card, i) => card.classList.toggle('active', i === (cardCount - index) % cardCount));
     };
     
     const rotateCarouselTo = (angle) => {
@@ -494,388 +484,155 @@ function setup3DCarousel() {
         carousel3d.style.transform = `translateZ(-300px) rotateY(${currentAngle}deg)`;
     };
 
-    const autoRotate = () => {
-        if (!isAutoRotating) return;
-        currentAngle += autoRotateSpeed;
-        carousel3d.style.transition = 'none';
-        rotateCarouselTo(currentAngle);
-        updateActiveCard(); // Update active card smoothly during auto-rotate
-        autoRotateID = requestAnimationFrame(autoRotate);
-    };
-    
-    const startAutoRotate = () => {
-        if (isAutoRotating) return;
-        isAutoRotating = true;
-        autoRotate();
-    };
-    
-    const stopAutoRotate = () => {
-        if (restartTimeout) clearTimeout(restartTimeout);
-        if (!isAutoRotating) return;
-        isAutoRotating = false;
-        if (autoRotateID) {
-            cancelAnimationFrame(autoRotateID);
-            autoRotateID = null;
-        }
-    };
-    
-    const snapToAngle = (angle, withAnimation = true) => {
-        carousel3d.style.transition = withAnimation 
-            ? 'transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1)'
-            : 'none';
+    const snapToAngle = (angle) => {
+        carousel3d.style.transition = 'transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1)';
         rotateCarouselTo(angle);
         updateActiveCard();
     };
 
-    const restartRotationAfterDelay = () => {
-        clearTimeout(restartTimeout);
-        restartTimeout = setTimeout(startAutoRotate, 5000);
-    };
-
-    prevBtn.addEventListener('click', () => {
-        stopAutoRotate();
-        const cardIndex = Math.round(currentAngle / theta);
-        snapToAngle((cardIndex - 1) * theta);
-        restartRotationAfterDelay();
-    });
-
-    nextBtn.addEventListener('click', () => {
-        stopAutoRotate();
-        const cardIndex = Math.round(currentAngle / theta);
-        snapToAngle((cardIndex + 1) * theta);
-        restartRotationAfterDelay();
-    });
+    prevBtn.addEventListener('click', () => snapToAngle(currentAngle - theta));
+    nextBtn.addEventListener('click', () => snapToAngle(currentAngle + theta));
     
-    // --- Drag Handlers ---
-    const handleDragStart = (clientX) => {
-        isDragging = true;
-        dragStartX = clientX;
-        startAngle = currentAngle;
-        stopAutoRotate();
-        carousel3d.style.transition = 'none';
-        carouselContainer.style.cursor = 'grabbing';
-    };
-
-    const handleDragMove = (clientX) => {
-        if (!isDragging) return;
-        const diffX = clientX - dragStartX;
-        // Dragging right (positive diffX) should spin the carousel to show items from the left.
-        // This corresponds to a negative rotation (e.g., rotateY(-30deg)).
-        const angleChange = diffX * dragSensitivity;
-        rotateCarouselTo(startAngle - angleChange);
-    };
-
-    const handleDragEnd = () => {
-        if (!isDragging) return;
-        isDragging = false;
-        carouselContainer.style.cursor = 'grab';
-        const cardIndex = Math.round(currentAngle / theta);
-        snapToAngle(cardIndex * theta);
-        restartRotationAfterDelay();
-    };
-
-    // --- Event Listeners ---
     carouselContainer.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        handleDragStart(e.clientX);
+        isDragging = true;
+        dragStartX = e.clientX;
+        startAngle = currentAngle;
+        carousel3d.style.transition = 'none';
     });
     window.addEventListener('mousemove', (e) => {
-        if(isDragging) handleDragMove(e.clientX);
+        if (!isDragging) return;
+        const diffX = e.clientX - dragStartX;
+        rotateCarouselTo(startAngle - (diffX * dragSensitivity));
     });
-    window.addEventListener('mouseup', handleDragEnd);
-    window.addEventListener('mouseleave', handleDragEnd);
-
-    carouselContainer.addEventListener('touchstart', (e) => {
-        dragStartX = e.touches[0].clientX;
-        dragStartY = e.touches[0].clientY;
-        // Drag start is deferred to touchmove to detect swipe direction
-    }, { passive: true });
-
-    carouselContainer.addEventListener('touchmove', (e) => {
-        if (e.touches.length === 0) return;
-        const currentX = e.touches[0].clientX;
-        const currentY = e.touches[0].clientY;
-
-        if (!isDragging) {
-            // Only start dragging if the swipe is predominantly horizontal
-            if (Math.abs(currentX - dragStartX) > Math.abs(currentY - dragStartY) + 5) {
-                handleDragStart(dragStartX);
-            } else {
-                // Vertical swipe, do nothing
-                return;
-            }
-        }
-
-        // If dragging has started, prevent vertical scroll and handle move
-        e.preventDefault();
-        handleDragMove(currentX);
-
-    }, { passive: false }); // passive:false is required to call preventDefault
-
-    carouselContainer.addEventListener('touchend', handleDragEnd);
+    window.addEventListener('mouseup', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        snapToAngle(Math.round(currentAngle / theta) * theta);
+    });
 
     createCards();
-    autoRotate();
+    rotateCarouselTo(0);
 }
 
-/**
- * Sets up animated filtering for the main portfolio grid.
- */
 function setupPortfolioFilters() {
     const filtersContainer = document.querySelector('.portfolio-filters');
     if (!filtersContainer) return;
-    
     filtersContainer.addEventListener('click', (e) => {
-        const target = e.target;
-        if (!target.matches('.filter-btn')) return;
-        filterPortfolio(target.dataset.filter);
-    });
-}
-
-function filterPortfolio(filter) {
-    const filtersContainer = document.querySelector('.portfolio-filters');
-    const portfolioGrid = document.querySelector('.portfolio-grid');
-    if (!filtersContainer || !portfolioGrid) return 'Portfolio section not found.';
-
-    const target = filtersContainer.querySelector(`[data-filter="${filter.toLowerCase()}"]`);
-    if (!target) return `Category '${filter}' not found.`;
-
-    if (target.classList.contains('active')) return `Category '${filter}' is already active.`;
-
-    filtersContainer.querySelector('.filter-btn.active')?.classList.remove('active');
-    target.classList.add('active');
-    
-    const portfolioCards = Array.from(portfolioGrid.children);
-    const transitionDuration = 400;
-
-    portfolioCards.forEach(card => {
-        const cardCategory = card.dataset.category;
-        const shouldBeVisible = filter.toLowerCase() === 'all' || cardCategory === filter.toLowerCase().replace(/\s+/g, '-');
-        const isVisible = !card.classList.contains('is-filtered-out');
-
-        if (isVisible && !shouldBeVisible) {
-            card.classList.add('is-filtered-out');
-        }
-    });
-
-    setTimeout(() => {
-        portfolioCards.forEach(card => {
-            const cardCategory = card.dataset.category;
-            const shouldBeVisible = filter.toLowerCase() === 'all' || cardCategory === filter.toLowerCase().replace(/\s+/g, '-');
-            
-            card.style.display = shouldBeVisible ? '' : 'none';
-
-            if (shouldBeVisible) {
-                setTimeout(() => card.classList.remove('is-filtered-out'), 10);
-            }
+        if (!e.target.matches('.filter-btn')) return;
+        const filter = e.target.dataset.filter;
+        filtersContainer.querySelector('.filter-btn.active')?.classList.remove('active');
+        e.target.classList.add('active');
+        document.querySelectorAll('.portfolio-card').forEach(card => {
+            const shouldShow = filter === 'all' || card.dataset.category === filter;
+            card.style.display = shouldShow ? '' : 'none';
         });
-    }, transitionDuration);
-
-    return `Filtered portfolio to show ${filter}.`;
+    });
 }
 
-/**
- * Sets up the Behance-style project viewer modal.
- */
 function setupProjectViewer() {
     const viewer = document.getElementById('projectViewer');
     if (!viewer) return;
-
     const titleEl = viewer.querySelector('.project-viewer-title');
     const categoryEl = viewer.querySelector('.project-viewer-category');
     const briefEl = viewer.querySelector('.project-viewer-brief');
     const bodyEl = viewer.querySelector('.project-viewer-body');
-    const contentEl = viewer.querySelector('.project-viewer-content');
     
-    const openViewer = (projectId) => {
-        const project = portfolioItems.find(p => p.id === projectId);
-        if (!project || !titleEl || !categoryEl || !briefEl || !bodyEl) return;
-        
-        titleEl.textContent = project.title;
-        categoryEl.textContent = project.category;
-        briefEl.textContent = project.projectBrief;
-
-        bodyEl.innerHTML = project.process.map(step => {
-            let stepHTML = '<div class="project-process-step">';
-            if (step.video) {
-                stepHTML += `<video src="${step.video}" controls autoplay muted loop playsinline alt="Project video for ${project.title}"></video>`;
-            } else if (step.image) {
-                stepHTML += `<img src="${step.image}" alt="Project detail for ${project.title}">`;
-            }
-            if (step.text) {
-                stepHTML += `<p>${step.text}</p>`;
-            }
-            stepHTML += '</div>';
-            return stepHTML;
-        }).join('');
-
-        viewer.classList.add('is-visible');
-        viewer.setAttribute('aria-hidden', 'false');
-        document.body.style.overflow = 'hidden';
-        contentEl.scrollTop = 0;
-    };
-
-    const closeViewer = () => {
-        viewer.classList.remove('is-visible');
-        viewer.setAttribute('aria-hidden', 'true');
-        document.body.style.overflow = '';
-    };
-
     document.body.addEventListener('click', (e) => {
-        const portfolioCard = e.target.closest('[data-id]');
-        if (portfolioCard) {
-             if (portfolioCard.matches('.carousel-3d .card') && !portfolioCard.classList.contains('active')) {
-                return;
-            }
-            e.preventDefault();
-            openViewer(portfolioCard.dataset.id);
-        }
-    });
-    
-    document.body.addEventListener('keydown', (e) => {
-        const portfolioCard = e.target.closest('[data-id]');
-        if (portfolioCard && (e.key === 'Enter' || e.key === ' ')) {
-             if (portfolioCard.matches('.carousel-3d .card') && !portfolioCard.classList.contains('active')) {
-                return;
-            }
-            e.preventDefault();
-            openViewer(portfolioCard.dataset.id);
+        const card = e.target.closest('[data-id]');
+        if (card) {
+            const project = portfolioItems.find(p => p.id === card.dataset.id);
+            if (!project) return;
+            titleEl.textContent = project.title;
+            categoryEl.textContent = project.category;
+            briefEl.textContent = project.projectBrief;
+            bodyEl.innerHTML = project.process.map(step => {
+                let html = '<div class="project-process-step">';
+                if (step.video) html += `<video src="${step.video}" controls autoplay muted loop playsinline></video>`;
+                else if (step.image) html += `<img src="${step.image}" alt="">`;
+                if (step.text) html += `<p>${step.text}</p>`;
+                return html + '</div>';
+            }).join('');
+            viewer.classList.add('is-visible');
+            document.body.style.overflow = 'hidden';
         }
     });
 
     viewer.addEventListener('click', (e) => {
         if (e.target.closest('.project-viewer-close') || e.target === viewer) {
-            closeViewer();
-        }
-    });
-
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && viewer.classList.contains('is-visible')) {
-            closeViewer();
+            viewer.classList.remove('is-visible');
+            document.body.style.overflow = '';
         }
     });
 }
 
-
-/**
- * Sets up the testimonial slider functionality.
- */
 function setupTestimonialsSlider() {
     const slider = document.querySelector('.testimonial-slider');
     const prevBtn = document.querySelector('.slider-btn.prev');
     const nextBtn = document.querySelector('.slider-btn.next');
-    if (!slider || !prevBtn || !nextBtn) return;
-
-    let currentIndex = 0;
-    const slides = slider.children;
-    const totalSlides = slides.length;
-
-    function updateSlider() {
-        slider.style.transform = `translateX(-${currentIndex * 100}%)`;
-    }
-
-    nextBtn.addEventListener('click', () => {
-        currentIndex = (currentIndex + 1) % totalSlides;
-        updateSlider();
-    });
-
-    prevBtn.addEventListener('click', () => {
-        currentIndex = (currentIndex - 1 + totalSlides) % totalSlides;
-        updateSlider();
-    });
+    if (!slider) return;
+    let index = 0;
+    const update = () => slider.style.transform = `translateX(-${index * 100}%)`;
+    nextBtn.addEventListener('click', () => { index = (index + 1) % slider.children.length; update(); });
+    prevBtn.addEventListener('click', () => { index = (index - 1 + slider.children.length) % slider.children.length; update(); });
 }
 
-/**
- * Sets up the "Read More" functionality in the About section.
- */
 function setupAboutToggle() {
-    const aboutContent = document.querySelector('.about-content');
-    if (!aboutContent) return;
+    const btn = document.querySelector('.read-more-btn');
+    const content = document.querySelector('.about-content');
+    if (btn) btn.addEventListener('click', () => { content.classList.add('is-expanded'); btn.style.display = 'none'; });
+}
 
-    const readMoreBtn = aboutContent.querySelector('.read-more-btn');
-    const fullTextContainer = aboutContent.querySelector('.about-full-text');
+function setupAIAssistant() {
+    const widget = document.querySelector('.ai-chat-widget');
+    const fab = widget?.querySelector('.chat-fab');
+    const form = widget?.querySelector('.chat-form');
+    const input = form?.querySelector('input');
+    const messages = widget?.querySelector('.chat-messages');
+    if (!widget) return;
 
-    if (!readMoreBtn || !fullTextContainer) return;
+    let textChat;
+    try {
+        const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
+        textChat = ai.chats.create({
+            model: 'gemini-3-flash-preview',
+            config: { systemInstruction: "You are an assistant for MEDAR STUDIO agency." },
+        });
+    } catch (e) { console.error(e); }
 
-    readMoreBtn.addEventListener('click', () => {
-        aboutContent.classList.add('is-expanded');
-        readMoreBtn.style.display = 'none';
+    fab.addEventListener('click', () => widget.classList.toggle('chat-open'));
+    widget.querySelector('.chat-close').addEventListener('click', () => widget.classList.remove('chat-open'));
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const msg = input.value.trim();
+        if (!msg) return;
+        const userMsg = document.createElement('div');
+        userMsg.className = 'message user-message';
+        userMsg.textContent = msg;
+        messages.appendChild(userMsg);
+        input.value = '';
+        const aiMsg = document.createElement('div');
+        aiMsg.className = 'message ai-message thinking';
+        aiMsg.textContent = '...';
+        messages.appendChild(aiMsg);
+        messages.scrollTop = messages.scrollHeight;
+        try {
+            const res = await textChat.sendMessage({ message: msg });
+            aiMsg.textContent = res.text;
+            aiMsg.classList.remove('thinking');
+        } catch (err) { aiMsg.textContent = "Error."; }
+        messages.scrollTop = messages.scrollHeight;
     });
 }
 
-
-/**
- * Sets up real-time validation for the contact form.
- */
 function setupContactForm() {
     const form = document.querySelector('.contact-form');
     if (!form) return;
-
-    const nameInput = form.querySelector('#name');
-    const emailInput = form.querySelector('#email');
-    const phoneInput = form.querySelector('#phone');
-    const messageInput = form.querySelector('#message');
-    const submitBtn = form.querySelector('button[type="submit"]');
-
-    if (!nameInput || !emailInput || !phoneInput || !messageInput || !submitBtn) return;
-    
-    const inputs = [nameInput, emailInput, phoneInput, messageInput];
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const phoneRegex = /^\+?[1-9]\d{1,14}$/; // Simple regex for international numbers
-
-    const validationRules = {
-        name: (value) => value.trim() !== '',
-        email: (value) => emailRegex.test(value.trim()),
-        phone: (value) => value.trim() === '' || phoneRegex.test(value.trim()), // Optional field
-        message: (value) => value.trim() !== '',
-    };
-
-    const errorMessages = {
-        name: 'Name cannot be empty.',
-        email: 'Please enter a valid email address.',
-        phone: 'Please enter a valid international phone number.',
-        message: 'Message cannot be empty.',
-    };
-
-    function validateInput(input) {
-        const value = input.value;
-        const name = input.name;
-        const isValid = validationRules[name] ? validationRules[name](value) : true;
-        const formGroup = input.parentElement;
-        const errorEl = formGroup?.querySelector('.error-message');
-
-        if (isValid) {
-            formGroup?.classList.add('valid');
-            formGroup?.classList.remove('invalid');
-            if (errorEl) errorEl.textContent = '';
-        } else {
-            formGroup?.classList.add('invalid');
-            formGroup?.classList.remove('valid');
-            if (errorEl) errorEl.textContent = errorMessages[name];
-        }
-        return isValid;
-    }
-
-    function checkFormValidity() {
-        const isNameValid = validationRules.name(nameInput.value);
-        const isEmailValid = validationRules.email(emailInput.value);
-        const isMessageValid = validationRules.message(messageInput.value);
-        const isPhoneValid = validationRules.phone(phoneInput.value);
-
-        submitBtn.disabled = !(isNameValid && isEmailValid && isMessageValid && isPhoneValid);
-    }
-
-    inputs.forEach(input => {
-        input.addEventListener('input', () => {
-            validateInput(input);
-            checkFormValidity();
-        });
+    form.addEventListener('input', () => {
+        form.querySelector('button').disabled = !form.checkValidity();
     });
 }
 
-/**
- * Sets up a dynamic background that reacts to mouse movement.
- */
 function setupInteractiveBackground() {
     window.addEventListener('mousemove', e => {
         document.documentElement.style.setProperty('--mouse-x', `${e.clientX}px`);
@@ -883,71 +640,22 @@ function setupInteractiveBackground() {
     });
 }
 
-/**
- * Handles the "Digital Genesis" preloader with a simple fade transition.
- */
-async function setupPreloader() {
-    const preloader = document.getElementById('preloader');
-    const particleContainer = document.getElementById('particle-container');
-    const logoContainer = document.querySelector('.genesis-logo');
-    const root = document.getElementById('root');
-
-    if (!preloader || !root || !particleContainer || !logoContainer) {
-        root?.classList.add('visible');
-        preloader?.remove();
-        return;
-    }
-
-    const logoText = "MEDAR STUDIO";
-    const MINIMUM_ANIMATION_TIME = 2800;
-    const FADE_DURATION = 500;
-
-    const createVisuals = () => {
-        // Create particles
-        const particleFragment = document.createDocumentFragment();
-        for (let i = 0; i < 50; i++) {
-            const particle = document.createElement('div');
-            particle.className = 'particle';
-            particle.classList.add(Math.random() > 0.5 ? 'cyan' : 'purple');
-            const size = Math.random() * 5 + 2;
-            particle.style.width = `${size}px`;
-            particle.style.height = `${size}px`;
-            particle.style.top = `${Math.random() * 100}%`;
-            particle.style.left = `${Math.random() * 100}%`;
-            particle.style.animationDelay = `${Math.random() * 0.5}s`;
-            particleFragment.appendChild(particle);
-        }
-        particleContainer.appendChild(particleFragment);
-
-        // Create logo
-        logoContainer.innerHTML = logoText.split('').map((char, index) => {
-            const delay = 0.5 + index * 0.05;
-            return `<span style="animation-delay: ${delay}s;">${char}</span>`;
-        }).join('');
-    };
-    
-    createVisuals();
-
-    const loadPromise = new Promise(resolve => {
-        window.addEventListener('load', resolve, { once: true });
-    });
-    const animationPromise = new Promise(resolve => setTimeout(resolve, MINIMUM_ANIMATION_TIME));
-
-    await Promise.all([loadPromise, animationPromise]);
-    
-    // Start the fade out transition for the preloader and fade in for the site
-    preloader.classList.add('is-hiding');
-    root.classList.add('visible');
-
-    // Remove preloader from DOM after transition is complete
-    setTimeout(() => {
-        preloader.remove();
-    }, FADE_DURATION);
+function setupSectionObserver() {
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(e => { if (e.isIntersecting) currentSection = e.target.id; });
+    }, { threshold: 0.5 });
+    document.querySelectorAll('section[id]').forEach(s => observer.observe(s));
 }
 
+function setupInactivityTimer() {
+    const show = () => document.querySelector('.chat-fab')?.classList.add('proactive-glow');
+    const reset = () => {
+        document.querySelector('.chat-fab')?.classList.remove('proactive-glow');
+        clearTimeout(inactivityTimer);
+        inactivityTimer = setTimeout(show, 30000);
+    };
+    ['mousemove', 'keydown', 'scroll', 'click'].forEach(e => window.addEventListener(e, reset));
+    reset();
+}
 
-// Initial render of the application when the DOM is ready.
-document.addEventListener('DOMContentLoaded', () => {
-    setupPreloader();
-    renderApp();
-});
+document.addEventListener('DOMContentLoaded', renderApp);
